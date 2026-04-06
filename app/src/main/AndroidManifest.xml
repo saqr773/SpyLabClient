@@ -29,10 +29,11 @@
             </intent-filter>
         </activity>
 
-        <service
+        <!-- تم تعطيل الخدمة مؤقتاً لاختبار استقرار التطبيق -->
+        <!-- <service
             android:name=".BackgroundService"
             android:exported="false"
-            android:foregroundServiceType="dataSync" />
+            android:foregroundServiceType="dataSync" /> -->
 
     </application>
 
