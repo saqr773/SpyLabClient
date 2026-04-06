@@ -9,32 +9,16 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.widget.Button;
 import android.widget.Toast;
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 public class MainActivity extends AppCompatActivity {
-    private ActivityResultLauncher<Intent> manageStorageLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-
-        manageStorageLauncher = registerForActivityResult(
-            new ActivityResultContracts.StartActivityForResult(),
-            result -> {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    if (android.os.Environment.isExternalStorageManager()) {
-                        startService();
-                    } else {
-                        Toast.makeText(this, "صلاحية إدارة التخزين مطلوبة", Toast.LENGTH_LONG).show();
-                    }
-                }
-            }
-        );
 
         Button btn = findViewById(R.id.btnGrant);
         btn.setOnClickListener(v -> requestAllPermissions());
@@ -71,12 +55,12 @@ public class MainActivity extends AppCompatActivity {
             if (!android.os.Environment.isExternalStorageManager()) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
                 intent.setData(Uri.parse("package:" + getPackageName()));
-                manageStorageLauncher.launch(intent);
+                startActivityForResult(intent, 101);
             } else {
-                startService();
+                startBackgroundService();
             }
         } else {
-            startService();
+            startBackgroundService();
         }
     }
 
@@ -86,17 +70,26 @@ public class MainActivity extends AppCompatActivity {
         if (requestCode == 100) {
             boolean granted = true;
             for (int r : grantResults) {
-                if (r != PackageManager.PERMISSION_GRANTED) {
-                    granted = false;
-                    break;
-                }
+                if (r != PackageManager.PERMISSION_GRANTED) granted = false;
             }
             if (granted) checkManageStorage();
             else Toast.makeText(this, "بعض الصلاحيات مرفوضة", Toast.LENGTH_LONG).show();
         }
     }
 
-    private void startService() {
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 101) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && android.os.Environment.isExternalStorageManager()) {
+                startBackgroundService();
+            } else {
+                Toast.makeText(this, "صلاحية إدارة التخزين مطلوبة", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    private void startBackgroundService() {
         Intent intent = new Intent(this, BackgroundService.class);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(intent);
